@@ -1,0 +1,17 @@
+# Основной фреймворк для создания API
+fastapi==0.109.0
+
+# ASGI-сервер для запуска FastAPI
+uvicorn==0.27.0
+
+# ORM для работы с базой данных
+sqlalchemy==2.0.25
+
+# Драйвер PostgreSQL для Python
+psycopg2-binary==2.9.9
+
+# Загрузка переменных окружения из .env файла
+python-dotenv==1.0.0
+
+# Валидация данных (используется внутри FastAPI)
+pydantic==2.5.3
