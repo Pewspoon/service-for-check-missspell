@@ -8,10 +8,10 @@ uvicorn==0.27.0
 sqlalchemy==2.0.25
 
 # Драйвер PostgreSQL для Python
-psycopg2-binary==2.9.9
+psycopg[binary]>=3.1.0
 
 # Загрузка переменных окружения из .env файла
 python-dotenv==1.0.0
 
 # Валидация данных (используется внутри FastAPI)
-pydantic==2.5.3
+pydantic>=2.8

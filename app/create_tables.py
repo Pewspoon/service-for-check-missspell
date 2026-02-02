@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Скрипт для создания таблиц в базе данных с использованием чистого PostgreSQL.
-Выполняет сырой SQL через библиотеку psycopg2.
-"""
-
 # Импорт библиотеки для работы с PostgreSQL
 import psycopg2                                      # Драйвер PostgreSQL
 from psycopg2 import sql                             # Для безопасного формирования SQL-запросов
