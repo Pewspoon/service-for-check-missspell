@@ -1,53 +1,68 @@
-# Импорт компонентов SQLAlchemy для описания таблицы
-from sqlalchemy import Column, Integer, String, DateTime, func  # Типы полей
-from ..database import Base  # Базовый класс для моделей
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
 
 
-# Определяем класс-модель, который будет соответствовать таблице в БД
-class User(Base):
-    __tablename__ = "users"  # Имя таблицы в базе данных
+# Pydantic модели
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+    MODERATOR = "moderator"
 
-    # Первичный ключ — уникальный идентификатор пользователя
-    # index=True ускоряет поиск по этому полю
-    id = Column(Integer, primary_key=True, index=True)
 
-    # Имя пользователя — уникальное, не может быть пустым
-    username = Column(String(50), unique=True, nullable=False, index=True)
+class UserBase(SQLModel):
+    username: str = Field(index=True, unique=True, min_length=3, max_length=50)
+    email: str = Field(unique=True, index=True)
+    full_name: Optional[str] = None
+    role: UserRole = Field(default=UserRole.USER)
 
-    # Email — тоже уникальный и обязательный
-    email = Column(String(100), unique=True, nullable=False, index=True)
 
-    # Баланс кредитов — целое число, по умолчанию 10
-    balance = Column(Integer, default=10, nullable=False)
+class BalanceBase(SQLModel):
+    amount: float = Field(default=0.0, ge=0)
 
-    # Дата и время создания аккаунта —
-    # автоматически заполняется СУБД текущим временем
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Дата последнего входа — может быть пустой
-    last_login = Column(DateTime(timezone=True), nullable=True)
+class TransactionBase(SQLModel):
+    amount: float = Field(gt=0)
+    type: str = Field(description="deposit, withdrawal")
+    description: Optional[str] = None
 
-    # Метод для удобного отображения объекта в консоли (отладка)
-    def __repr__(self):
-        return (
-            f"<User(id={self.id}, username='{self.username}', "
-            f"balance={self.balance})>"
-        )
 
-    # Метод для преобразования объекта в словарь (удобно для отправки в JSON)
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "username": self.username,
-            "email": self.email,
-            "balance": self.balance,
-            # Преобразуем datetime в строку формата ISO 8601
-            "created_at": (
-                self.created_at.isoformat()
-                if self.created_at else None
-            ),
-            "last_login": (
-                self.last_login.isoformat()
-                if self.last_login else None
-            )
-        }
+class UserCreate(UserBase):
+    password: str
+
+
+class UserUpdate(SQLModel):
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+
+
+class TransactionCreate(TransactionBase):
+    user_id: int
+
+
+# Таблицы
+class User(UserBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    hashed_password: str
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    balance: Optional["Balance"] = Relationship(back_populates="user")
+    transactions: List["Transaction"] = Relationship(back_populates="user")
+
+
+class Balance(BalanceBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True)
+    user: User = Relationship(back_populates="balance")
+
+
+class Transaction(TransactionBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+    user_id: int = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    user: User = Relationship(back_populates="transactions")

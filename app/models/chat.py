@@ -4,7 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..databases.database import Base
 
 
 # Модель сообщения в чате — хранит пары "оригинал → исправленный текст"
