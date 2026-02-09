@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypoFixer - Исправление опечаток</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .typewriter {
+      overflow: hidden;
+      white-space: nowrap;
+      animation: typing 3.5s steps(30, end);
+    }
+    
+    @keyframes typing {
+      from { width: 0 }
+      to { width: 100% }
+    }
+    
+    .loader {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+    
+    .loader-dot {
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    
+    .loader-dot:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+    
+    .loader-dot:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+    
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+    
+    .gradient-text {
+      background: linear-gradient(90deg, #ffffff 0%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
+  <div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+        <span id="main-title" class="gradient-text">TypoFixer</span>
+      </h1>
+      <p class="text-gray-400 max-w-2xl mx-auto text-lg">
+        Мгновенно исправляйте опечатки и ошибки в вашем тексте. Просто введите текст и нажмите "Исправить".
+      </p>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="bg-[#111111] rounded-2xl shadow-xl overflow-hidden border border-gray-800">
+      <div class="p-6 md:p-8">
+        <!-- Title area that transforms to loading -->
+        <div id="status-container" class="mb-6">
+          <h2 id="status-text" class="text-xl font-semibold text-gray-200">
+            Начните с ввода текста ниже
+          </h2>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="mb-6">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm font-medium text-gray-400">Исходный текст</label>
+            <button id="clear-input" class="flex items-center text-sm text-gray-400 hover:text-white transition-colors">
+              <i data-lucide="x" class="w-4 h-4 mr-1"></i>
+              Очистить
+            </button>
+          </div>
+          <textarea 
+            id="input-text" 
+            class="w-full h-40 md:h-60 bg-[#161616] border border-gray-700 rounded-xl p-4 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+            placeholder="Введите текст с опечатками здесь..."
+          ></textarea>
+        </div>
+        
+        <!-- Action Button -->
+        <div class="flex justify-center mb-8">
+          <button 
+            id="fix-button" 
+            class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-8 rounded-xl flex items-center transition-all shadow-lg hover:shadow-blue-500/30 transform hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <i data-lucide="sparkles" class="w-5 h-5 mr-2"></i>
+            Исправить текст
+          </button>
+        </div>
+        
+        <!-- Output Area -->
+        <div id="output-section" class="hidden">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm font-medium text-gray-400">Исправленный текст</label>
+            <button id="copy-output" class="flex items-center text-sm text-gray-400 hover:text-white transition-colors">
+              <i data-lucide="copy" class="w-4 h-4 mr-1"></i>
+              Копировать
+            </button>
+          </div>
+          <div class="relative">
+            <textarea 
+              id="output-text" 
+              class="w-full h-40 md:h-60 bg-[#161616] border border-gray-700 rounded-xl p-4 text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none"
+              placeholder="Исправленный текст появится здесь..."
+              readonly
+            ></textarea>
+            <div id="copy-indicator" class="absolute bottom-3 right-3 bg-green-500 text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity">
+              Скопировано!
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="hidden absolute inset-0 bg-[#111111]/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+        <div class="loader mb-6">
+          <div class="loader-dot w-3 h-3 bg-blue-500 rounded-full mx-1"></div>
+          <div class="loader-dot w-3 h-3 bg-indigo-500 rounded-full mx-1"></div>
+          <div class="loader-dot w-3 h-3 bg-purple-500 rounded-full mx-1"></div>
+        </div>
+        <p id="loading-text" class="text-blue-200 font-medium animate-pulse">Обработка текста...</p>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="text-center mt-8 text-gray-500 text-sm">
+      <p>© 2023 TypoFixer. Технология исправления опечаток.</p>
+    </div>
+  </div>
+  
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+    
+    // DOM Elements
+    const inputText = document.getElementById('input-text');
+    const outputText = document.getElementById('output-text');
+    const outputSection = document.getElementById('output-section');
+    const fixButton = document.getElementById('fix-button');
+    const clearButton = document.getElementById('clear-input');
+    const copyOutputButton = document.getElementById('copy-output');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    const copyIndicator = document.getElementById('copy-indicator');
+    
+    // Typewriter Effect for Title
+    const titleText = "TypoFixer";
+    const mainTitle = document.getElementById('main-title');
+    const originalTitle = mainTitle.innerHTML;
+    
+    // Wait for page load, then show typing effect
+    setTimeout(() => {
+      mainTitle.innerHTML = '';
+      let i = 0;
+      const speed = 150; // ms
+      
+      function typeWriter() {
+        if (i < titleText.length) {
+          mainTitle.innerHTML += titleText.charAt(i);
+          i++;
+          setTimeout(typeWriter, speed);
+        }
+      }
+      
+      typeWriter();
+    }, 300);
+    
+    // Clear Input Functionality
+    clearButton.addEventListener('click', () => {
+      inputText.value = '';
+      outputSection.classList.add('hidden');
+    });
+    
+    // Copy Output Functionality
+    copyOutputButton.addEventListener('click', () => {
+      if (outputText.value) {
+        navigator.clipboard.writeText(outputText.value).then(() => {
+          copyIndicator.style.opacity = '1';
+          setTimeout(() => {
+            copyIndicator.style.opacity = '0';
+          }, 2000);
+        });
+      }
+    });
+    
+    // Mock API call to simulate typo correction
+    async function fixText() {
+      const text = inputText.value.trim();
+      
+      if (!text) {
+        alert('Пожалуйста, введите текст для исправления');
+        return;
+      }
+      
+      // Show loading state
+      loadingOverlay.classList.remove('hidden');
+      loadingText.textContent = 'Анализ текста...';
+      
+      // Simulate different loading stages
+      setTimeout(() => {
+        loadingText.textContent = 'Обнаружение ошибок...';
+      }, 1000);
+      
+      setTimeout(() => {
+        loadingText.textContent = 'Исправление опечаток...';
+      }, 2000);
+      
+      try {
+        // Simulate API response with mock data
+        // Replace this with your actual API call
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Mock correction - in production, use your actual API response
+        const correctedText = mockCorrection(text);
+        
+        // Show output
+        outputText.value = correctedText;
+        outputSection.classList.remove('hidden');
+        
+        // Update status text
+        document.getElementById('status-text').textContent = 'Текст успешно исправлен!';
+        document.getElementById('status-text').classList.remove('text-gray-200');
+        document.getElementById('status-text').classList.add('text-green-400');
+        
+      } catch (error) {
+        console.error('Ошибка при исправлении текста:', error);
+        document.getElementById('status-text').textContent = 'Произошла ошибка при обработке текста';
+        document.getElementById('status-text').classList.remove('text-gray-200');
+        document.getElementById('status-text').classList.add('text-red-400');
+      } finally {
+        loadingOverlay.classList.add('hidden');
+      }
+    }
+    
+    // Mock correction function (replace with real API logic)
+    function mockCorrection(text) {
+      // This is a very basic mock correction
+      // In production, you would call your actual typo correction API
+      const commonTypos = {
+        'привет': 'привет',
+        'мир': 'мир',
+        'как': 'как',
+        'дела': 'дела',
+        'хорошо': 'хорошо',
+      };
+      
+      // Simple mock: capitalize first letter of sentences and fix some common typos
+      let corrected = text;
+      
+      // Capitalize first letter of sentences
+      corrected = corrected.replace(/(^\s*[a-z]|\.\s+[a-z]|\!\s+[a-z]|\?\s+[a-z])/g, (match) => match.toUpperCase());
+      
+      // Add some mock corrections for demonstration
+      if (text.includes('не правилно')) {
+        corrected = corrected.replace('не правилно', 'неправильно');
+      }
+      if (text.includes('привет))')) {
+        corrected = corrected.replace('привет))', 'привет');
+      }
+      
+      // If no specific corrections made, add a note
+      if (corrected === text) {
+        corrected += '\n\n(Текст был проверен, специфические ошибки не найдены. Проверьте орфографию и грамматику вручную.)';
+      }
+      
+      return corrected;
+    }
+    
+    // Event Listeners
+    fixButton.addEventListener('click', fixText);
+    
+    // Add keyboard shortcut (Ctrl+Enter to fix)
+    inputText.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        fixText();
+      }
+    });
+    
+    // Reset status text on input change
+    inputText.addEventListener('input', () => {
+      if (inputText.value.trim() === '') {
+        document.getElementById('status-text').textContent = 'Начните с ввода текста ниже';
+        document.getElementById('status-text').classList.remove('text-green-400', 'text-red-400');
+        document.getElementById('status-text').classList.add('text-gray-200');
+        outputSection.classList.add('hidden');
+      } else {
+        document.getElementById('status-text').textContent = 'Готово к проверке';
+        document.getElementById('status-text').classList.remove('text-green-400', 'text-red-400');
+        document.getElementById('status-text').classList.add('text-gray-200');
+      }
+    });
+  </script>
+</body>
+</html>
