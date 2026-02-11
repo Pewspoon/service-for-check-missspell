@@ -4,14 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.home import home_route
 from routes.user import user_route
 from routes.event import event_router
-from backend.app.database.create_tables import init_db
-from backend.app.database.create_tables import get_session
+from database.create_tables import init_db
+from database.config import get_settings
 import uvicorn
 import logging
 
 
 logger = logging.getLogger(__name__)
-settings = get_session()
+settings = get_settings()
 
 
 @asynccontextmanager
@@ -58,11 +58,15 @@ def create_application() -> FastAPI:
     app.include_router(home_route, tags=['Home'])
     app.include_router(user_route, prefix='/api/users', tags=['Users'])
     app.include_router(event_router, prefix='/api/events', tags=['Events'])
-    app.include_router(event_router, prefix='health', tags=['Events'])
+    app.include_router(event_router, prefix='/health', tags=['health'])
     return app
 
 
 app = create_application()
+
+@app.get("/test")
+def test():
+    return {"message": "Hellow, world!"}
 
 
 if __name__ == '__main__':
