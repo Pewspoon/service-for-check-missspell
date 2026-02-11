@@ -41,6 +41,10 @@ services:
       - ./app/.env
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     networks:
       - event-planner-network
 
