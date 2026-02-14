@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.home import home_route
 from routes.user import user_route
 from routes.event import event_router
+from routes.balance import balance_of_user_route
 from routes.ml import ml_router
+from routes.history_of_ml_transaction import history_router
 from database.create_tables import init_db
 from database.config import get_settings
 import uvicorn
@@ -57,11 +59,20 @@ def create_application() -> FastAPI:
 
     # Register routes
     app.include_router(home_route, tags=['Home'])
-    app.include_router(user_route, prefix='/api/users', tags=['/auth'])
-    app.include_router(user_route, prefix='/api/users', tags=['/auth'])
     app.include_router(event_router, prefix='/api/events', tags=['Events'])
-    app.include_router(event_router, prefix='/health', tags=['health'])
-    app.include_router(ml_router, tags=['ml'])
+    app.include_router(event_router, prefix='/health', tags=['Health'])
+
+    # /auth - registration and authentication
+    app.include_router(user_route, prefix='/api/auth', tags=['/auth'])
+
+    # /balance - balance operations
+    app.include_router(balance_of_user_route, prefix='/api/balance', tags=['/balance'])
+
+    # /predict - ML requests
+    app.include_router(ml_router, prefix='/api/predict', tags=['/predict'])
+
+    # /history - operation history
+    app.include_router(history_router, prefix='/api/history', tags=['/history'])
     return app
 
 

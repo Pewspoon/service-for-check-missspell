@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .event import Event
 
 
-# Pydantic модели
+# Pydantic models
 class UserRole(str, Enum):
     """Roles available for users in the system."""
     USER = "user"
@@ -54,7 +54,39 @@ class TransactionCreate(TransactionBase):
     user_id: int
 
 
-# Таблицы
+class MLModelBase(SQLModel):
+    """Base schema with common fields for ML models."""
+    name: str = Field(min_length=1, max_length=255)
+    version: str = Field(default="1.0.0")
+    description: Optional[str] = None
+
+
+class MLModelCreate(MLModelBase):
+    """Schema for creating an ML model via API request."""
+    file_path: str
+
+
+class MLModelRead(MLModelBase):
+    """Schema for reading ML model data in API response."""
+    id: int
+    file_path: str
+    created_at: datetime
+
+
+class MLPredictionRequest(SQLModel):
+    """Schema for ML prediction request payload."""
+    text: str
+    model_id: int
+    user_id: int
+
+
+class MLPredictionResponse(SQLModel):
+    """Schema for ML prediction response data."""
+    result: str
+    model_name: str
+
+
+# Database tables
 class User(UserBase, table=True):
     """Database model for users."""
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -97,6 +129,7 @@ class Balance(BalanceBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", unique=True)
     user: User = Relationship(back_populates="balance")
+    amount_of_replenishment: Optional[int]
 
 
 class Transaction(TransactionBase, table=True):
@@ -106,3 +139,35 @@ class Transaction(TransactionBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: User = Relationship(back_populates="transactions")
+
+
+class MLModel(MLModelBase, table=True):
+    """Database model for ML models table."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    file_path: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: int = Field(foreign_key="user.id")
+
+
+class MLPredictionHistory(SQLModel, table=True):
+    """Database model for ML prediction history."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    model_id: int = Field(foreign_key="mlmodel.id")
+    input_text: str
+    result: str
+    cost: float
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MLPredictionHistoryRead(SQLModel):
+    """Schema for reading ML prediction history."""
+    id: int
+    user_id: int
+    model_id: int
+    input_text: str
+    result: str
+    cost: float
+    created_at: datetime
+
+
