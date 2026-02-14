@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.home import home_route
 from routes.user import user_route
 from routes.event import event_router
+from routes.ml import ml_router
 from database.create_tables import init_db
 from database.config import get_settings
 import uvicorn
@@ -56,17 +57,15 @@ def create_application() -> FastAPI:
 
     # Register routes
     app.include_router(home_route, tags=['Home'])
-    app.include_router(user_route, prefix='/api/users', tags=['Users'])
+    app.include_router(user_route, prefix='/api/users', tags=['/auth'])
+    app.include_router(user_route, prefix='/api/users', tags=['/auth'])
     app.include_router(event_router, prefix='/api/events', tags=['Events'])
     app.include_router(event_router, prefix='/health', tags=['health'])
+    app.include_router(ml_router, tags=['ml'])
     return app
 
 
 app = create_application()
-
-@app.get("/test")
-def test():
-    return {"message": "Hellow, world!"}
 
 
 if __name__ == '__main__':

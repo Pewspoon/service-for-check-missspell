@@ -1,6 +1,6 @@
 from sqlmodel import Session
-from app.models.user import UserBase, UserRole
-from app.database.create_tables import engine
+from models.user import UserBase, UserRole
+from database.create_tables import engine
 
 
 def main():
