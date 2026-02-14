@@ -1,7 +1,7 @@
 """Тесты для модели ChatMessage"""
 from datetime import datetime
 
-from app.models.chat import ChatMessage
+from models.chat import ChatMessage
 
 
 class TestChatMessage:
