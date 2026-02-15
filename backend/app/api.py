@@ -1,3 +1,9 @@
+"""Модуль конфигурации и создания FastAPI приложения.
+
+Содержит функции для создания и настройки приложения FastAPI,
+включая настройку CORS, маршрутизацию и управление жизненным циклом.
+"""
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +25,20 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan context manager."""
+    """Контекстный менеджер жизненного цикла приложения.
+    
+    Выполняет инициализацию базы данных при запуске приложения
+    и корректное завершение работы при остановке.
+    
+    Args:
+        app: Экземпляр FastAPI приложения.
+    
+    Yields:
+        None: Контроль передаётся основному приложению.
+    
+    Raises:
+        Exception: Если инициализация базы данных не удалась.
+    """
     try:
         logger.info("Initializing database...")
         init_db()
@@ -33,11 +52,13 @@ async def lifespan(app: FastAPI):
 
 
 def create_application() -> FastAPI:
-    """
-    Create and configure FastAPI application.
-
+    """Создаёт и настраивает FastAPI приложение.
+    
+    Создаёт экземпляр FastAPI с настройками из конфигурации,
+    добавляет CORS middleware и регистрирует все маршруты API.
+    
     Returns:
-        FastAPI: Configured application instance
+        FastAPI: Сконфигурированный экземпляр приложения.
     """
     app = FastAPI(
         title=settings.APP_NAME,

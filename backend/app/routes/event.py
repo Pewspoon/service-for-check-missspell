@@ -15,6 +15,7 @@ event_router = APIRouter()
 async def retrieve_all_events(
     session: Session = Depends(get_session),
 ) -> list[Event]:
+    """Получить список всех событий."""
     return list(session.exec(select(Event)).all())
 
 
@@ -26,6 +27,7 @@ async def retrieve_event(
     id: int,
     session: Session = Depends(get_session),
 ) -> Event:
+    """Получить событие по его ID."""
     event = session.get(Event, id)
     if not event:
         raise HTTPException(
@@ -43,6 +45,7 @@ async def create_event(
     payload: EventCreate,
     session: Session = Depends(get_session),
 ) -> Dict:
+    """Создать новое событие."""
     event = Event(**payload.model_dump())
     session.add(event)
     session.commit()
@@ -57,6 +60,7 @@ async def delete_event(
     id: int,
     session: Session = Depends(get_session),
 ) -> Dict:
+    """Удалить событие по его ID."""
     event = session.get(Event, id)
     if not event:
         raise HTTPException(

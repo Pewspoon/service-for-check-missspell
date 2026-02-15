@@ -1,9 +1,19 @@
+"""Модуль для инициализации тестовых данных в базе.
+
+Содержит функцию для создания тестовых пользователей.
+"""
+
 from sqlmodel import Session
 from models.user import UserBase, UserRole
 from database.create_tables import engine
 
 
 def main():
+    """Создаёт тестовых пользователей в базе данных.
+    
+    Добавляет четырёх тестовых пользователей с именем Bob
+    и различными email-адресами.
+    """
     with Session(engine) as session:
         user = UserBase(
             username="Bob",
