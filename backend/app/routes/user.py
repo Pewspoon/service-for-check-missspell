@@ -61,27 +61,6 @@ async def register_user(
     )
 
 
-@user_route.post(
-    "/autorisation",
-    status_code=status.HTTP_200_OK,
-    response_model=AuthorizationResponse,
-)
-async def autorisation_user(
-    payload: UserCreate,
-    session: Session = Depends(get_session),
-) -> AuthorizationResponse:
-    """Устаревший эндпоинт авторизации (без JWT)."""
-    user = session.exec(
-        select(User).where(User.email == payload.email)
-    ).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    return AuthorizationResponse(username=user.username, message="Welcome!")
-
 
 @user_route.post(
     "/login",
