@@ -5,7 +5,9 @@ from database.create_tables import get_session
 from models.user import (
     MLPredictionHistory,
     MLPredictionHistoryRead,
+    User,
 )
+from auth import get_current_active_user
 
 
 history_router = APIRouter()
@@ -17,16 +19,16 @@ history_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 async def create_history_record(
-    user_id: int,
     model_id: int,
     input_text: str,
     result: str,
     cost: float,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
 ) -> MLPredictionHistoryRead:
-    """Create a new ML prediction history record."""
+    """Создать новую запись истории ML-предсказаний для текущего пользователя."""
     history_record = MLPredictionHistory(
-        user_id=user_id,
+        user_id=current_user.id,
         model_id=model_id,
         input_text=input_text,
         result=result,
@@ -35,7 +37,6 @@ async def create_history_record(
     session.add(history_record)
     session.commit()
     session.refresh(history_record)
-
 
     return MLPredictionHistoryRead(
         id=history_record.id,
@@ -49,18 +50,18 @@ async def create_history_record(
 
 
 @history_router.get(
-    "/ml/history/{user_id}",
+    "/me",
     response_model=List[MLPredictionHistoryRead],
     status_code=status.HTTP_200_OK,
 )
-async def get_user_history(
-    user_id: int,
+async def get_my_history(
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
 ) -> List[MLPredictionHistoryRead]:
-    """Get ML prediction history for a user."""
+    """Получить историю ML-предсказаний для текущего пользователя."""
     history_records = session.exec(
         select(MLPredictionHistory).where(
-            MLPredictionHistory.user_id == user_id
+            MLPredictionHistory.user_id == current_user.id
         )
     ).all()
 

@@ -20,3 +20,15 @@ python-dotenv==1.0.0
 
 # Валидация данных (используется внутри FastAPI)
 pydantic_settings>=2.8
+
+# JWT токены для идентификации users
+python-jose[cryptography]>=3.3.0
+
+# Хеширование паролей
+passlib[bcrypt]>=1.7.4
+
+# Дополнительная зависимость для bcrypt
+bcrypt>=4.0.0
+
+# Обработка form-data (OAuth2PasswordRequestForm)
+python-multipart>=0.0.22

@@ -6,7 +6,7 @@ home_route = APIRouter()
 
 @home_route.get("/health")
 async def health_check():
-    """Health check endpoint for Docker healthcheck"""
+    """Эндпоинт проверки здоровья для Docker healthcheck."""
     return {"status": "healthy"}
 
 @home_route.get("/",
@@ -14,6 +14,7 @@ async def health_check():
                 summary="Root endpoint",
                 description="Returns a welcome message")
 async def index() -> str:
+    """Корневой эндпоинт API. Возвращает приветственное сообщение."""
     try:
         return {"message": "Welcome to Event planner API!"}
     except:
