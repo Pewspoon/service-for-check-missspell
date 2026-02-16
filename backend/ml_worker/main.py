@@ -1,6 +1,5 @@
-from rmq.rmqconf import RabbitMQConfig
-from rmq.rmqworker import MLWorker
-from rmq.rpcworker import RPCWorker
+from rmqconf import RabbitMQConfig
+from worker import MLWorker
 import sys
 import pika
 import time
@@ -9,28 +8,23 @@ import logging
 # Настраиваем базовую конфигурацию логирования
 logging.basicConfig(
     level=logging.DEBUG,  # Устанавливаем уровень логирования DEBUG
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'  # Задаем формат сообщений лога
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 logger = logging.getLogger(__name__)
 
 
-def create_worker(mode: str, config: RabbitMQConfig):
-    """Create appropriate worker instance based on mode."""
-    return MLWorker(config) if mode == 'ml' else RPCWorker(config)
-
-
 def run_worker(worker):
-    """Run worker with reconnection logic."""
+    """Запускает воркер с логикой переподключения."""
     while True:
         try:
             if not worker.connection or not worker.connection.is_open:
                 logger.info("Connecting to RabbitMQ...")
                 worker.connect()
-            
+
             logger.info("Starting message consumption...")
             worker.start_consuming()
-            
+
         except pika.exceptions.AMQPConnectionError as e:
             logger.error(f"Connection error: {e}")
             logger.info("Retrying in 5 seconds...")
@@ -38,18 +32,18 @@ def run_worker(worker):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             raise
-        
+
         time.sleep(1)
 
 
 def main():
-    mode = 'rpc' # Можно использовать rpc
+    mode = 'ml'  # Режим ML для обработки задач
     logger.info(f"Starting worker in {mode} mode")
-    
+
     worker = None
     try:
         config = RabbitMQConfig()
-        worker = create_worker(mode, config)
+        worker = MLWorker(config)
         run_worker(worker)
     except Exception as e:
         logger.error(f"Application error: {e}")

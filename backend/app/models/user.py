@@ -97,6 +97,14 @@ class MLPredictionHistoryRead(SQLModel):
     created_at: datetime
 
 
+class TaskResultRequest(SQLModel):
+    """Схема для получения результата от ML-воркера."""
+    task_id: str
+    prediction: str
+    worker_id: str
+    status: str = "completed"
+
+
 # ============ User Response Schema (без пароля!) ============
 
 class UserResponse(SQLModel):
