@@ -1,4 +1,4 @@
-from rmq.rmqconf import RabbitMQConfig
+from rmqconf import RabbitMQConfig
 from llm import do_task
 import pika
 import time
@@ -7,12 +7,16 @@ import logging
 import json
 
 # Настраиваем общий уровень логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Устанавливаем уровень WARNING для логов pika
 logging.getLogger('pika').setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
+
 
 # Определяем основной класс для обработки ML задач
 class MLWorker:
@@ -24,13 +28,14 @@ class MLWorker:
     MAX_RETRIES = 3
     RETRY_DELAY = 0.5
     RESULT_ENDPOINT = 'http://app:8080/api/ml/send_task_result'
-    
-    def __init__(self, config: RabbitMQConfig):
+
+    def __init__(self, config: RabbitMQConfig, worker_id: str = "worker-1"):
         """
         Инициализация обработчика с заданной конфигурацией.
-        
+
         Args:
             config: Объект конфигурации RabbitMQ
+            worker_id: Идентификатор воркера
         """
         # Сохраняем конфигурацию
         self.config = config
@@ -39,7 +44,8 @@ class MLWorker:
         # Инициализируем канал как None
         self.channel = None
         self.retry_count = 0
-        
+        self.worker_id = worker_id
+
     def connect(self) -> None:
         """
         Установка соединения с сервером RabbitMQ с повторными попытками.
@@ -67,17 +73,30 @@ class MLWorker:
         except Exception as e:
             logger.error(f"Ошибка при закрытии соединений: {e}")
 
-    def send_result(self, task_id: str, result: str) -> bool:
+    def send_result(
+        self, task_id: str, prediction: str, status: str = "success"
+    ) -> bool:
         """
         Отправка результатов обработки задачи на сервер.
-        
+
+        Args:
+            task_id: ID задачи
+            prediction: Результат предсказания
+            status: Статус выполнения ("success" или "error")
+
         Returns:
             bool: Признак успешности отправки результата
         """
         try:
+            payload = {
+                "task_id": task_id,
+                "prediction": prediction,
+                "worker_id": self.worker_id,
+                "status": status
+            }
             response = requests.post(
                 self.RESULT_ENDPOINT,
-                params={'task_id': task_id, 'result': result}
+                json=payload
             )
             response.raise_for_status()
             return True
@@ -88,59 +107,63 @@ class MLWorker:
     def process_message(self, ch, method, properties, body):
         """
         Обработка полученного сообщения из очереди.
-        
+
         Args:
             ch: Объект канала RabbitMQ
             method: Метод доставки сообщения
             properties: Свойства сообщения
             body: Тело сообщения
-            
-        Note:
-            Симулирует обработку задачи с задержкой в 3 секунды
         """
         try:
             # Логируем информацию о полученном сообщении
             logger.info(f"Processing message: {body}")
-            
+
             # Декодируем bytes в строку и затем парсим JSON
             data = json.loads(body.decode('utf-8'))
-            
-            result = do_task(data['question'])
-            
+
+            # Извлекаем данные из features
+            features = data.get('features', {})
+            text = features.get('text', '')
+
+            result = do_task(text)
+
             logger.info(f"Result: {result}")
-            
-            if self.send_result(data['task_id'], result):
+
+            if self.send_result(data['task_id'], result, "success"):
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 self.retry_count = 0
                 logger.info("Task completed successfully")
             else:
                 raise Exception("Failed to send result")
-                
+
         except Exception as e:
             logger.error(f"Error processing message: {e}")
             self.retry_count += 1
-            
+
             if self.retry_count >= self.MAX_RETRIES:
                 logger.error("Max retries reached, rejecting message")
-                ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
+                ch.basic_reject(
+                    delivery_tag=method.delivery_tag,
+                    requeue=False
+                )
                 self.retry_count = 0
             else:
                 time.sleep(self.RETRY_DELAY)
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-            
+
     def start_consuming(self) -> None:
         """
         Запуск процесса получения сообщений из очереди.
-        
+
         Note:
             Блокирующая операция, прерывается по Ctrl+C
         """
         try:
             # Настраиваем потребление сообщений из очереди
             self.channel.basic_consume(
-                queue=self.config.queue_name,  # Имя очереди
-                on_message_callback=self.process_message,  # Callback для обработки сообщений
-                auto_ack=False  # Отключаем автоматическое подтверждение
+                queue=self.config.queue_name,
+                on_message_callback=self.process_message,
+                auto_ack=False
             )
             # Логируем информацию о старте потребления сообщений
             logger.info('Started consuming messages. Press Ctrl+C to exit.')
@@ -152,3 +175,30 @@ class MLWorker:
         finally:
             # Закрываем соединение при завершении работы
             self.cleanup()
+
+    def send_message(self, message: dict) -> None:
+        """
+        Отправляет сообщение в очередь RabbitMQ.
+
+        Args:
+            message (str): Сообщение для отправки.
+
+        Note:
+            Сообщение отправляется в очередь, указанную в конфигурации.
+        """
+        try:
+            # Публикуем сообщение в очередь
+            self.channel.basic_publish(
+                exchange='',
+                routing_key=self.config.queue_name,
+                body=json.dumps(message).encode('utf-8'),
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                )
+            )
+            # Логируем информацию об успешной отправке сообщения
+            logger.info(f"Message sent to queue {self.config.queue_name}")
+        except Exception as e:
+            # Логируем ошибку при отправке сообщения
+            logger.error(f"Error sending message: {e}")
+            raise
