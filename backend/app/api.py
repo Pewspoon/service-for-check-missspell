@@ -64,8 +64,8 @@ def create_application() -> FastAPI:
         title=settings.APP_NAME,
         description=settings.APP_DESCRIPTION,
         version=settings.API_VERSION,
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
+        docs_url="/api/docs",           # теперь документация будет доступна по /api/docs
+        openapi_url="/api/openapi.json", # и схема по /api/openapi.json
         lifespan=lifespan,
     )
 
@@ -90,6 +90,7 @@ def create_application() -> FastAPI:
     app.include_router(balance_of_user_route, prefix='/api/balance', tags=['/balance'])
 
     # /predict - ML requests
+    app.include_router(ml_router, prefix='/api/predict', tags=['/predict'])
     app.include_router(ml_router, prefix='/api/predict', tags=['/predict'])
 
     # /history - operation history

@@ -27,7 +27,7 @@ class MLWorker:
     # Константы класса
     MAX_RETRIES = 3
     RETRY_DELAY = 0.5
-    RESULT_ENDPOINT = 'http://app:8080/api/ml/send_task_result'
+    RESULT_ENDPOINT = 'http://app:8080/api/predict/send_task_result'
 
     def __init__(self, config: RabbitMQConfig, worker_id: str = "worker-1"):
         """
@@ -48,19 +48,24 @@ class MLWorker:
 
     def connect(self) -> None:
         """
-        Установка соединения с сервером RabbitMQ с повторными попытками.
+        Устанавливает соединение с RabbitMQ с повторными попытками (бесконечный цикл).
+        При успехе создаёт канал и объявляет очередь с durable=True.
         """
         while True:
             try:
                 connection_params = self.config.get_connection_params()
                 self.connection = pika.BlockingConnection(connection_params)
                 self.channel = self.connection.channel()
-                self.channel.queue_declare(queue=self.config.queue_name)
+                # Очередь должна быть durable, чтобы не терять сообщения при перезапуске RabbitMQ
+                self.channel.queue_declare(queue=self.config.queue_name, durable=True)
                 logger.info("Successfully connected to RabbitMQ")
-                break
+                break  # Выход из цикла при успехе
+            except pika.exceptions.AMQPConnectionError as e:
+                logger.error(f"RabbitMQ connection error: {e}")
             except Exception as e:
-                logger.error(f"Failed to connect to RabbitMQ: {e}")
-                time.sleep(self.RETRY_DELAY)
+                logger.error(f"Unexpected error while connecting to RabbitMQ: {e}")
+            logger.info(f"Retrying in {self.RETRY_DELAY} seconds...")
+            time.sleep(self.RETRY_DELAY)
 
     def cleanup(self):
         """Корректное закрытие соединений с RabbitMQ"""

@@ -286,5 +286,6 @@ class MLPredictionHistory(SQLModel, table=True):
     result: str
     cost: float
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    task_id: Optional[str] = Field(default=None, index=True)  # новое поле
 
 

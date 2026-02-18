@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from models.user import TaskResultRequest
 from database.create_tables import get_session
 from auth import get_current_active_user
-from ml_worker.rmqconf import RabbitMQConfig
+#from ml_worker.rmqconf import RabbitMQConfig
 from datetime import datetime
 from models.user import (
     Balance,
@@ -27,7 +27,7 @@ ml_router = APIRouter()
 PREDICTION_COST = 10.0
 
 # Конфигурация RabbitMQ
-rabbitmq_config = RabbitMQConfig()
+#rabbitmq_config = RabbitMQConfig()
 
 
 def send_task_to_queue(
@@ -35,36 +35,32 @@ def send_task_to_queue(
 ) -> bool:
     """
     Отправляет задачу в RabbitMQ очередь.
-    
-    Args:
-        task_id: Уникальный идентификатор задачи
-        model_name: Имя модели
-        features: Словарь с данными для обработки
-        
-    Returns:
-        bool: Успешность отправки
     """
     try:
-        connection = pika.BlockingConnection(
-            rabbitmq_config.get_connection_params()
+        credentials = pika.PlainCredentials('admin', 'password123')
+        parameters = pika.ConnectionParameters(
+            host='rabbitmq',
+            port=5672,
+            credentials=credentials,
+            heartbeat=600,
+            blocked_connection_timeout=300
         )
+        connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
-        channel.queue_declare(queue=rabbitmq_config.queue_name, durable=True)
-        
+        channel.queue_declare(queue='ml_task_queue', durable=True)
+
         task_data = {
             'task_id': task_id,
             'features': features,
             'model': model_name,
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         channel.basic_publish(
             exchange='',
-            routing_key=rabbitmq_config.queue_name,
+            routing_key='ml_task_queue',
             body=json.dumps(task_data),
-            properties=pika.BasicProperties(
-                delivery_mode=2,  # persistent
-            )
+            properties=pika.BasicProperties(delivery_mode=2)
         )
         connection.close()
         logger.info(f"Task {task_id} sent to queue")
@@ -163,12 +159,13 @@ async def ml_predict(
         ):
             raise Exception("Failed to send task to queue")
         
-        # Создаём запись в истории предсказаний (статус pending)
+        # Создаём запись в истории предсказаний с task_id и статусом PENDING
         history_record = MLPredictionHistory(
             user_id=current_user.id,
             model_id=ml_model.id,
             input_text=request.text,
-            result=f"PENDING:{task_id}",  # Временно, пока воркер не обработает
+            task_id=task_id,                      # <-- добавлено поле task_id
+            result=f"PENDING:{task_id}",          # можно оставить так (совместимость) или изменить на "PENDING"
             cost=PREDICTION_COST,
         )
         session.add(history_record)
@@ -224,10 +221,9 @@ async def receive_task_result(
         dict: Статус операции
     """
     try:
-        # Ищем запись по task_id (хранится в поле result как PENDING:{task_id})
         history_record = session.exec(
             select(MLPredictionHistory).where(
-                MLPredictionHistory.result == f"PENDING:{request.task_id}"
+                MLPredictionHistory.task_id == request.task_id
             )
         ).first()
 
@@ -249,3 +245,45 @@ async def receive_task_result(
     except Exception as e:
         logger.error(f"Error saving task result: {e}")
         return {"status": "error", "message": str(e)}
+    
+
+@ml_router.get("/result/{task_id}")
+async def get_prediction_result(
+    task_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Получить результат предсказания по task_id.
+    Доступно только для авторизованного пользователя, которому принадлежит задача.
+    """
+    # Ищем запись по task_id и user_id (для безопасности)
+    record = session.exec(
+        select(MLPredictionHistory).where(
+            MLPredictionHistory.task_id == task_id,
+            MLPredictionHistory.user_id == current_user.id
+        )
+    ).first()
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found or you don't have access"
+        )
+
+    # Если задача ещё в обработке
+    if record.result.startswith("PENDING"):
+        return {
+            "status": "pending",
+            "task_id": task_id,
+            "message": "Task is still being processed"
+        }
+
+    # Задача завершена, возвращаем результат
+    return {
+        "status": "completed",
+        "task_id": task_id,
+        "result": record.result,
+        "model_id": record.model_id,
+        "created_at": record.created_at.isoformat() if record.created_at else None
+    }
