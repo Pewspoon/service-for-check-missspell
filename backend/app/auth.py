@@ -6,22 +6,23 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
+
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
+
 from models.user import User
 from database.create_tables import get_session
 from database.config import get_settings
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверяет пароль против хеша.
+    """Проверяет пароль против хеша с использованием bcrypt.
     
     Args:
         plain_password: Пароль в открытом виде.
@@ -30,11 +31,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         bool: True если пароль совпадает с хешем, иначе False.
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8')
+    )
 
 
 def get_password_hash(password: str) -> str:
-    """Генерирует хеш из пароля.
+    """Генерирует хеш из пароля с использованием bcrypt.
     
     Args:
         password: Пароль в открытом виде.
@@ -42,7 +46,9 @@ def get_password_hash(password: str) -> str:
     Returns:
         str: Хешированный пароль.
     """
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 
 def create_access_token(
@@ -56,6 +62,9 @@ def create_access_token(
     
     Returns:
         str: Закодированный JWT токен.
+    
+    Raises:
+        ValueError: Если SECRET_KEY не задан в настройках.
     """
     to_encode = data.copy()
     if expires_delta:
@@ -65,8 +74,19 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     to_encode.update({"exp": expire})
+
+    # Проверяем, что SECRET_KEY вообще задан
+    if settings.SECRET_KEY is None:
+        raise ValueError(
+            "SECRET_KEY не задан в настройках. Проверьте переменную окружения или .env файл."
+        )
+
+    # Приводим ключ к строке (если вдруг это SecretStr или другой объект)
+    secret_key = str(settings.SECRET_KEY)
+
+    # Кодируем токен
     encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+        to_encode, secret_key, algorithm=settings.ALGORITHM
     )
     return encoded_jwt
 
