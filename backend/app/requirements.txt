@@ -21,7 +21,7 @@ python-dotenv==1.0.0
 # Валидация данных (используется внутри FastAPI)
 pydantic_settings>=2.8
 
-# JWT токены для идентификации users
+# JWT токены для идентификации usersв
 python-jose[cryptography]>=3.3.0
 
 # Хеширование паролей

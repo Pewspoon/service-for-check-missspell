@@ -3,7 +3,6 @@ from sqlmodel import Session, select
 from models.user import TaskResultRequest
 from database.create_tables import get_session
 from auth import get_current_active_user
-#from ml_worker.rmqconf import RabbitMQConfig
 from datetime import datetime
 from models.user import (
     Balance,
@@ -25,9 +24,6 @@ logger = logging.getLogger(__name__)
 ml_router = APIRouter()
 
 PREDICTION_COST = 10.0
-
-# Конфигурация RabbitMQ
-#rabbitmq_config = RabbitMQConfig()
 
 
 def send_task_to_queue(
@@ -101,8 +97,11 @@ async def ml_predict(
     current_user: User = Depends(get_current_active_user),
 ) -> MLPredictionResponse:
     """Получить предсказание от ML-модели с проверкой баланса."""
+    # Используем user_id из токена, если не передан в запросе
+    user_id = request.user_id if request.user_id else current_user.id
+    
     # Verify user can only access their own predictions
-    if request.user_id != current_user.id:
+    if user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only make predictions for yourself",

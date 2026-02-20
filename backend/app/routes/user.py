@@ -11,6 +11,7 @@ from auth import (
     get_current_active_user,
 )
 from database.config import get_settings
+from models.user import Balance 
 
 user_route = APIRouter()
 settings = get_settings()
@@ -26,7 +27,7 @@ async def register_user(
     session: Session = Depends(get_session),
 ) -> UserResponse:
     """Зарегистрировать нового пользователя с хешированным паролем."""
-    # Check for unique email and username
+    # Проверка на уникальность
     existing_user = session.exec(
         select(User).where(
             (User.email == payload.email) | (User.username == payload.username)
@@ -38,6 +39,7 @@ async def register_user(
             detail="User with this email or username already exists",
         )
 
+    # Создаём пользователя
     user = User(
         username=payload.username,
         email=payload.email,
@@ -46,9 +48,18 @@ async def register_user(
         hashed_password=get_password_hash(payload.password),
     )
     session.add(user)
+    session.flush()  # чтобы получить id пользователя до коммита
+
+    # Создаём начальный баланс (можно задать стартовую сумму, например 0)
+    balance = Balance(
+        user_id=user.id,
+        amount=100  # или другое значение, если хотите давать бонус
+    )
+    session.add(balance)
+
     session.commit()
     session.refresh(user)
-    
+
     return UserResponse(
         id=user.id,
         username=user.username,

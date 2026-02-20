@@ -77,7 +77,7 @@ class MLPredictionRequest(SQLModel):
     """Схема для запроса ML-предсказания."""
     text: str
     model_id: int
-    user_id: int
+    user_id: Optional[int] = None
 
 
 class MLPredictionResponse(SQLModel):

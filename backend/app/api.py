@@ -13,14 +13,37 @@ from routes.event import event_router
 from routes.balance import balance_of_user_route
 from routes.ml import ml_router
 from routes.history_of_ml_transaction import history_router
-from database.create_tables import init_db
+from database.create_tables import init_db, engine
 from database.config import get_settings
+from models.user import MLModel
+from sqlmodel import Session, select
 import uvicorn
 import logging
 
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def create_default_ml_model():
+    """Создаёт ML-модель по умолчанию, если она не существует."""
+    with Session(engine) as session:
+        existing = session.exec(
+            select(MLModel).where(MLModel.name == "gemma3:270M-F16")
+        ).first()
+        if not existing:
+            ml_model = MLModel(
+                name="gemma3:270M-F16",
+                version="1.0.0",
+                description="Default ML model for text processing",
+                file_path="/models/gemma3:270M-F16",
+                user_id=1  # системный пользователь
+            )
+            session.add(ml_model)
+            session.commit()
+            logger.info("Default ML model created: gemma3:270M-F16")
+        else:
+            logger.info("ML model already exists: gemma3:270M-F16")
 
 
 @asynccontextmanager
@@ -42,6 +65,8 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Initializing database...")
         init_db()
+        logger.info("Creating default ML model...")
+        create_default_ml_model()
         logger.info("Application startup completed successfully")
         yield
     except Exception as e:
@@ -90,7 +115,6 @@ def create_application() -> FastAPI:
     app.include_router(balance_of_user_route, prefix='/api/balance', tags=['/balance'])
 
     # /predict - ML requests
-    app.include_router(ml_router, prefix='/api/predict', tags=['/predict'])
     app.include_router(ml_router, prefix='/api/predict', tags=['/predict'])
 
     # /history - operation history

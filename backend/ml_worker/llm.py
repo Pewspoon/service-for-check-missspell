@@ -4,7 +4,7 @@ import json
 
 # Константы
 OLLAMA_URL = 'http://ollama:11434/api/generate'
-MODEL_NAME = 'gemma3:270m'   
+MODEL_NAME = 'gemma3:270M-F16'   
 NUM_PREDICT = 30  # количество токенов для предсказания
 REQUEST_TIMEOUT = 10  # seconds
 

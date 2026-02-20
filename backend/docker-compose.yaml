@@ -36,18 +36,6 @@ services:
     networks:
       - event-planner-network
 
-  streamlit:
-    build: ../frontend/
-    container_name: event-planner-streamlit
-    restart: unless-stopped
-    expose:
-      - "8501"
-    depends_on:
-      app:
-        condition: service_healthy
-    networks:
-      - event-planner-network
-
   db:
     image: postgres:16-alpine
     container_name: event-planner-db
@@ -94,6 +82,7 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - event-planner-network
+    command: /bin/sh -c "ollama pull gemma3:270M-F16 || true && exec ollama serve"
 
   ml_worker:
     build: ./ml_worker/
@@ -107,6 +96,23 @@ services:
       - event-planner-network
     deploy:
       replicas: 2  # Два воркера для параллельной обработки
+  
+  streamlit:
+    build: ./streamlit/
+    container_name: event-planner-streamlit
+    restart: unless-stopped
+    environment:
+      - API_BASE_URL=http://app:8080   # имя сервиса app и порт, на котором работает FastAPI (см. healthcheck)
+    volumes:
+      - ./streamlit:/app                # монтируем код для hot-reload при разработке
+    depends_on:
+      app:
+        condition: service_healthy       # ждём, пока бэкенд станет здоров
+    networks:
+      - event-planner-network
+    # Для отладки можно открыть порт наружу (раскомментировать при необходимости)
+    # ports:
+    #   - "8501:8501"
 
 volumes:
   postgres_data:
