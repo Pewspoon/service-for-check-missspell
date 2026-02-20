@@ -49,15 +49,16 @@ async def replenishment_of_user_balance(
         select(Balance).where(Balance.user_id == current_user.id)
     ).first()
 
+    # Если баланса нет - создаём его
     if not balance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Balance not found",
+        balance = Balance(
+            user_id=current_user.id,
+            amount=payload.amount,
+            amount_of_replenishment=0
         )
-
-    # Update balance of user
-    balance.amount += payload.amount
-    session.add(balance)
+        session.add(balance)
+    else:
+        balance.amount += payload.amount
 
     # Create transaction record of update balance
     transaction = Transaction(
