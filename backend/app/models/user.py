@@ -1,3 +1,11 @@
+"""Модуль пользовательского домена: схемы API и модели БД.
+
+Содержит:
+- роли и сущности пользователей;
+- баланс и транзакции;
+- ML-модели, историю предсказаний и вспомогательные схемы ответов.
+"""
+
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
@@ -119,6 +127,7 @@ class UserResponse(SQLModel):
     updated_at: Optional[datetime] = None
 
     class Config:
+        """Включает чтение данных из ORM-объектов."""
         from_attributes = True
 
 
@@ -167,6 +176,7 @@ class TransactionResponse(SQLModel):
     created_at: datetime
 
     class Config:
+        """Включает чтение данных из ORM-объектов."""
         from_attributes = True
 
 
@@ -192,6 +202,7 @@ class EventResponse(SQLModel):
     created_at: datetime
 
     class Config:
+        """Включает чтение данных из ORM-объектов."""
         from_attributes = True
 
 
@@ -211,6 +222,7 @@ class ChatMessageResponse(SQLModel):
     created_at: datetime
 
     class Config:
+        """Включает чтение данных из ORM-объектов."""
         from_attributes = True
 
 
@@ -287,5 +299,4 @@ class MLPredictionHistory(SQLModel, table=True):
     cost: float
     created_at: datetime = Field(default_factory=datetime.utcnow)
     task_id: Optional[str] = Field(default=None, index=True)  # новое поле
-
 

@@ -1,3 +1,5 @@
+"""Клиент обращения к Ollama для выполнения ML-задачи воркера."""
+
 import requests
 import logging
 import json

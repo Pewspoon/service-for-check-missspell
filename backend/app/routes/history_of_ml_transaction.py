@@ -1,3 +1,5 @@
+"""Роуты истории ML-операций текущего пользователя."""
+
 from typing import List
 from fastapi import APIRouter, status, Depends
 from sqlmodel import Session, select

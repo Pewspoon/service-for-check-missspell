@@ -1,3 +1,8 @@
+"""Роуты базовой доступности API.
+
+Содержит корневой эндпоинт и healthcheck для проверки работоспособности сервиса.
+"""
+
 from fastapi import APIRouter, HTTPException
 from typing import Dict
 

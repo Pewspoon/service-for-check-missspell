@@ -102,7 +102,7 @@ services:
     container_name: event-planner-streamlit
     restart: unless-stopped
     environment:
-      - API_BASE_URL=http://app:8080   # имя сервиса app и порт, на котором работает FastAPI (см. healthcheck)
+      - API_BASE_URL=http://app:8080   # имя сервиса app и порт, на котором работает FastAPI 
     volumes:
       - ./streamlit:/app                # монтируем код для hot-reload при разработке
     depends_on:

@@ -1,3 +1,5 @@
+"""Конфигурация подключения ML-воркера к RabbitMQ."""
+
 from dataclasses import dataclass
 import pika
 

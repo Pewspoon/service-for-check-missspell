@@ -1,3 +1,5 @@
+"""ML-воркер: получает задачи из RabbitMQ, выполняет их и отправляет результаты в API."""
+
 from rmqconf import RabbitMQConfig
 from llm import do_task
 import pika

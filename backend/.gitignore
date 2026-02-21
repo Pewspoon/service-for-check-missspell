@@ -44,3 +44,5 @@ htmlcov/
 *.swo
 *~
 .DS_Store
+.venv/
+.vscode/settings.json
