@@ -1,3 +1,5 @@
+"""Роуты ML-предсказаний: очередь задач, проверка баланса и выдача результатов."""
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from models.user import TaskResultRequest

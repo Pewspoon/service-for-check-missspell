@@ -1,3 +1,5 @@
+"""Streamlit-клиент для работы с API: авторизация, баланс, ML-запросы и история."""
+
 import streamlit as st
 import requests
 import os
@@ -8,6 +10,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://app:8080")
 
 # ---------- Функции для работы с API ----------
 def register_user(username, email, full_name, password):
+    """Регистрирует пользователя через API и возвращает пару `(data, error)`."""
     url = f"{API_BASE_URL}/api/auth/register"
     payload = {
         "username": username,
@@ -27,6 +30,7 @@ def register_user(username, email, full_name, password):
         return None, f"Ошибка соединения: {e}"
 
 def login_user(username, password):
+    """Выполняет вход пользователя и возвращает JWT-токен или ошибку."""
     url = f"{API_BASE_URL}/api/auth/login"
     data = {
         "username": username,
@@ -43,6 +47,7 @@ def login_user(username, password):
         return None, f"Ошибка соединения: {e}"
 
 def get_current_user(token):
+    """Запрашивает профиль текущего пользователя по access-токену."""
     url = f"{API_BASE_URL}/api/auth/me"
     headers = {"Authorization": f"Bearer {token}"}
     try:
@@ -55,6 +60,7 @@ def get_current_user(token):
         return None, f"Ошибка соединения: {e}"
 
 def get_balance(token):
+    """Получает текущий баланс пользователя."""
     url = f"{API_BASE_URL}/api/balance/me"
     headers = {"Authorization": f"Bearer {token}"}
     try:
@@ -67,6 +73,7 @@ def get_balance(token):
         return None, f"Ошибка соединения: {e}"
 
 def replenish_balance(token, amount):
+    """Пополняет баланс пользователя на указанную сумму."""
     url = f"{API_BASE_URL}/api/balance/replenish"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {"amount": amount}
@@ -80,6 +87,7 @@ def replenish_balance(token, amount):
         return None, f"Ошибка соединения: {e}"
 
 def get_history(token):
+    """Запрашивает историю ML-операций пользователя."""
     url = f"{API_BASE_URL}/api/history/me"
     headers = {"Authorization": f"Bearer {token}"}
     try:
@@ -92,6 +100,7 @@ def get_history(token):
         return None, f"Ошибка соединения: {e}"
 
 def send_predict_request(token, text, model_id=1):
+    """Отправляет запрос на ML-предсказание и возвращает ответ API."""
     url = f"{API_BASE_URL}/api/predict/predict"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
@@ -108,6 +117,7 @@ def send_predict_request(token, text, model_id=1):
         return None, f"Ошибка соединения: {e}"
 
 def get_prediction_result(token, task_id):
+    """Проверяет статус и результат ML-задачи по `task_id`."""
     url = f"{API_BASE_URL}/api/predict/result/{task_id}"
     headers = {"Authorization": f"Bearer {token}"}
     try:
@@ -121,6 +131,7 @@ def get_prediction_result(token, task_id):
 
 # ---------- Страница входа/регистрации ----------
 def show_auth_page():
+    """Рендерит страницу входа и регистрации, обновляет `session_state.token`."""
     st.set_page_config(page_title="Авторизация", page_icon="🔐")
     st.title("🔐 Добро пожаловать")
 
@@ -167,6 +178,7 @@ def show_auth_page():
 
 # ---------- Основная страница (после входа) ----------
 def show_main_page():
+    """Рендерит личный кабинет: профиль, баланс, чат с моделью и историю запросов."""
     st.set_page_config(page_title="Личный кабинет", page_icon="💬", layout="wide")
     
     if "token" not in st.session_state:

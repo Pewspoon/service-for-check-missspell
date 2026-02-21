@@ -1,3 +1,5 @@
+"""Роуты CRUD-операций для событий."""
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from database.create_tables import get_session

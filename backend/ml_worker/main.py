@@ -1,3 +1,5 @@
+"""Точка входа для запуска ML-воркера в контейнере."""
+
 from rmqconf import RabbitMQConfig
 from worker import MLWorker
 import sys
@@ -37,6 +39,7 @@ def run_worker(worker):
 
 
 def main():
+    """Создаёт и запускает воркер, возвращает код завершения процесса."""
     mode = 'ml'  # Режим ML для обработки задач
     logger.info(f"Starting worker in {mode} mode")
 
