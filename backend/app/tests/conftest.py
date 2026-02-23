@@ -21,6 +21,7 @@ os.environ.setdefault("DB_USER", "test-user")
 os.environ.setdefault("DB_PASS", "test-pass")
 os.environ.setdefault("DB_NAME", "test-name")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 
 
 @pytest.fixture()
@@ -110,3 +111,33 @@ def ml_model_factory(session):
 
     return _factory
 
+
+@pytest.fixture()
+def client(engine):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("pika")
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from api import create_application
+    from database.create_tables import get_session
+
+    def override_get_session():
+        with Session(engine) as test_session:
+            yield test_session
+
+    @asynccontextmanager
+    async def no_lifespan(_: FastAPI):
+        # Изолируем тесты от реального startup (Postgres/RabbitMQ init).
+        yield
+
+    app = create_application()
+    app.dependency_overrides[get_session] = override_get_session
+    app.router.lifespan_context = no_lifespan
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()

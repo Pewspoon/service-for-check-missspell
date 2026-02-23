@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 
@@ -9,36 +7,44 @@ pytest.importorskip("jose")
 pytest.importorskip("pika")
 
 
-from fastapi import HTTPException, status
 from sqlmodel import select
 
 from models.user import (
     Balance,
     MLPredictionHistory,
-    MLPredictionRequest,
-    TaskResultRequest,
     Transaction,
 )
 
 import routes.ml as ml_routes
 
 
+def _login(client, *, username: str, password: str):
+    response = client.post(
+        "/api/auth/login",
+        data={"username": username, "password": password},
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_ml_predict_success_deducts_balance_and_creates_history(
-    session, user_factory, ml_model_factory, monkeypatch
+    client, session, user_factory, ml_model_factory, monkeypatch
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=50.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=50.0)
     model = ml_model_factory(user_id=user.id, name="m1")
+    headers = _login(client, username=user.username, password="password")
 
     monkeypatch.setattr(ml_routes, "send_task_to_queue", lambda **_: True)
 
-    response = asyncio.run(
-        ml_routes.ml_predict(
-            request=MLPredictionRequest(text="hello", model_id=model.id),
-            session=session,
-            current_user=user,
-        )
+    response = client.post(
+        "/api/predict/predict",
+        headers=headers,
+        json={"text": "hello", "model_id": model.id},
     )
-    assert response.model_name == "m1"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_name"] == "m1"
 
     balance = session.exec(select(Balance).where(Balance.user_id == user.id)).first()
     assert balance.amount == 50.0 - ml_routes.PREDICTION_COST
@@ -56,47 +62,37 @@ def test_ml_predict_success_deducts_balance_and_creates_history(
     assert len(history) == 1
     assert history[0].task_id is not None
     assert history[0].result.startswith("PENDING:")
-    assert history[0].task_id in response.result
+    assert history[0].task_id in body["result"]
 
 
 def test_ml_predict_forbids_prediction_for_other_user_id(
-    session, user_factory, ml_model_factory
+    client, user_factory, ml_model_factory
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=50.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=50.0)
     model = ml_model_factory(user_id=user.id, name="m1")
+    headers = _login(client, username=user.username, password="password")
 
-    with pytest.raises(HTTPException) as exc:
-        asyncio.run(
-            ml_routes.ml_predict(
-                request=MLPredictionRequest(
-                    text="hello",
-                    model_id=model.id,
-                    user_id=user.id + 1,
-                ),
-                session=session,
-                current_user=user,
-            )
-        )
-
-    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+    response = client.post(
+        "/api/predict/predict",
+        headers=headers,
+        json={"text": "hello", "model_id": model.id, "user_id": user.id + 1},
+    )
+    assert response.status_code == 403
 
 
 def test_ml_predict_rejects_when_insufficient_balance(
-    session, user_factory, ml_model_factory
+    client, session, user_factory, ml_model_factory
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=5.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=5.0)
     model = ml_model_factory(user_id=user.id, name="m1")
+    headers = _login(client, username=user.username, password="password")
 
-    with pytest.raises(HTTPException) as exc:
-        asyncio.run(
-            ml_routes.ml_predict(
-                request=MLPredictionRequest(text="hello", model_id=model.id),
-                session=session,
-                current_user=user,
-            )
-        )
-
-    assert exc.value.status_code == status.HTTP_402_PAYMENT_REQUIRED
+    response = client.post(
+        "/api/predict/predict",
+        headers=headers,
+        json={"text": "hello", "model_id": model.id},
+    )
+    assert response.status_code == 402
 
     balance = session.exec(select(Balance).where(Balance.user_id == user.id)).first()
     assert balance.amount == 5.0
@@ -111,22 +107,20 @@ def test_ml_predict_rejects_when_insufficient_balance(
 
 
 def test_ml_predict_refunds_balance_when_queue_send_fails(
-    session, user_factory, ml_model_factory, monkeypatch
+    client, session, user_factory, ml_model_factory, monkeypatch
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=20.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=20.0)
     model = ml_model_factory(user_id=user.id, name="m1")
+    headers = _login(client, username=user.username, password="password")
 
     monkeypatch.setattr(ml_routes, "send_task_to_queue", lambda **_: False)
 
-    with pytest.raises(HTTPException) as exc:
-        asyncio.run(
-            ml_routes.ml_predict(
-                request=MLPredictionRequest(text="hello", model_id=model.id),
-                session=session,
-                current_user=user,
-            )
-        )
-    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    response = client.post(
+        "/api/predict/predict",
+        headers=headers,
+        json={"text": "hello", "model_id": model.id},
+    )
+    assert response.status_code == 500
 
     balance = session.exec(select(Balance).where(Balance.user_id == user.id)).first()
     assert balance.amount == 20.0
@@ -142,9 +136,9 @@ def test_ml_predict_refunds_balance_when_queue_send_fails(
 
 
 def test_receive_task_result_updates_history_record(
-    session, user_factory, ml_model_factory
+    client, session, user_factory, ml_model_factory
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=100.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=100.0)
     model = ml_model_factory(user_id=user.id, name="m1")
 
     record = MLPredictionHistory(
@@ -158,18 +152,17 @@ def test_receive_task_result_updates_history_record(
     session.add(record)
     session.commit()
 
-    result = asyncio.run(
-        ml_routes.receive_task_result(
-            request=TaskResultRequest(
-                task_id="task-1",
-                prediction="OK",
-                worker_id="worker-1",
-                status="completed",
-            ),
-            session=session,
-        )
+    result = client.post(
+        "/api/predict/send_task_result",
+        json={
+            "task_id": "task-1",
+            "prediction": "OK",
+            "worker_id": "worker-1",
+            "status": "completed",
+        },
     )
-    assert result["status"] == "success"
+    assert result.status_code == 200
+    assert result.json()["status"] == "success"
 
     saved = session.exec(
         select(MLPredictionHistory).where(MLPredictionHistory.task_id == "task-1")
@@ -177,27 +170,27 @@ def test_receive_task_result_updates_history_record(
     assert saved.result == "OK"
 
 
-def test_receive_task_result_returns_error_when_task_not_found(session):
-    result = asyncio.run(
-        ml_routes.receive_task_result(
-            request=TaskResultRequest(
-                task_id="missing",
-                prediction="OK",
-                worker_id="worker-1",
-                status="completed",
-            ),
-            session=session,
-        )
+def test_receive_task_result_returns_error_when_task_not_found(client):
+    result = client.post(
+        "/api/predict/send_task_result",
+        json={
+            "task_id": "missing",
+            "prediction": "OK",
+            "worker_id": "worker-1",
+            "status": "completed",
+        },
     )
-    assert result["status"] == "error"
-    assert result["message"] == "Task not found"
+    assert result.status_code == 200
+    assert result.json()["status"] == "error"
+    assert result.json()["message"] == "Task not found"
 
 
 def test_get_prediction_result_pending_and_completed(
-    session, user_factory, ml_model_factory
+    client, session, user_factory, ml_model_factory
 ):
-    user = user_factory(username="u1", email="u1@example.com", balance_amount=100.0)
+    user = user_factory(username="user1", email="user1@example.com", balance_amount=100.0)
     model = ml_model_factory(user_id=user.id, name="m1")
+    headers = _login(client, username=user.username, password="password")
 
     record = MLPredictionHistory(
         user_id=user.id,
@@ -210,36 +203,33 @@ def test_get_prediction_result_pending_and_completed(
     session.add(record)
     session.commit()
 
-    pending = asyncio.run(
-        ml_routes.get_prediction_result(
-            task_id="task-1",
-            session=session,
-            current_user=user,
-        )
+    pending = client.get(
+        "/api/predict/result/task-1",
+        headers=headers,
     )
-    assert pending["status"] == "pending"
+    assert pending.status_code == 200
+    assert pending.json()["status"] == "pending"
 
     record.result = "OK"
     session.add(record)
     session.commit()
 
-    completed = asyncio.run(
-        ml_routes.get_prediction_result(
-            task_id="task-1",
-            session=session,
-            current_user=user,
-        )
+    completed = client.get(
+        "/api/predict/result/task-1",
+        headers=headers,
     )
-    assert completed["status"] == "completed"
-    assert completed["result"] == "OK"
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+    assert completed.json()["result"] == "OK"
 
 
 def test_get_prediction_result_returns_404_for_other_user(
-    session, user_factory, ml_model_factory
+    client, session, user_factory, ml_model_factory
 ):
-    owner = user_factory(username="u1", email="u1@example.com", balance_amount=100.0)
-    other = user_factory(username="u2", email="u2@example.com", balance_amount=100.0)
+    owner = user_factory(username="user1", email="user1@example.com", balance_amount=100.0)
+    other = user_factory(username="user2", email="user2@example.com", balance_amount=100.0)
     model = ml_model_factory(user_id=owner.id, name="m1")
+    other_headers = _login(client, username=other.username, password="password")
 
     session.add(
         MLPredictionHistory(
@@ -253,13 +243,8 @@ def test_get_prediction_result_returns_404_for_other_user(
     )
     session.commit()
 
-    with pytest.raises(HTTPException) as exc:
-        asyncio.run(
-            ml_routes.get_prediction_result(
-                task_id="task-1",
-                session=session,
-                current_user=other,
-            )
-        )
-    assert exc.value.status_code == status.HTTP_404_NOT_FOUND
-
+    response = client.get(
+        "/api/predict/result/task-1",
+        headers=other_headers,
+    )
+    assert response.status_code == 404
