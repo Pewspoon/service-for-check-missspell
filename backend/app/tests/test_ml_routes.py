@@ -1,21 +1,15 @@
 import pytest
-
-
-pytest.importorskip("fastapi")
-pytest.importorskip("bcrypt")
-pytest.importorskip("jose")
-pytest.importorskip("pika")
-
-
 from sqlmodel import select
-
 from models.user import (
     Balance,
     MLPredictionHistory,
     Transaction,
 )
-
 import routes.ml as ml_routes
+pytest.importorskip("fastapi")
+pytest.importorskip("bcrypt")
+pytest.importorskip("jose")
+pytest.importorskip("pika")
 
 
 def _login(client, *, username: str, password: str):

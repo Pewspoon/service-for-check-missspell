@@ -1,11 +1,7 @@
 import pytest
-
-
 pytest.importorskip("fastapi")
 pytest.importorskip("bcrypt")
 pytest.importorskip("jose")
-
-
 from sqlmodel import select
 
 from models.user import MLPredictionHistory
