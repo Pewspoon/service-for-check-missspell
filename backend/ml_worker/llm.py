@@ -3,10 +3,11 @@
 import requests
 import logging
 import json
+import os
 
 # Константы
 OLLAMA_URL = 'http://ollama:11434/api/generate'
-MODEL_NAME = 'gemma3:270M-F16'   
+DEFAULT_MODEL_NAME = os.getenv("OLLAMA_MODEL", "gemma3:1b")
 NUM_PREDICT = 30  # количество токенов для предсказания
 REQUEST_TIMEOUT = 10  # seconds
 
@@ -34,7 +35,7 @@ def _parse_response(response_text: str) -> str:
     return full_response.strip()
 
 
-def do_task(text: str) -> str:
+def do_task(text: str, model_name: str | None = None) -> str:
     """
     Выполняет задачу обработки текста с помощью LLM.
 
@@ -44,11 +45,12 @@ def do_task(text: str) -> str:
     Returns:
         str: Краткое продолжение текста (не более 10 токенов)
     """
+    model_for_request = (model_name or DEFAULT_MODEL_NAME).strip()
     try:
         response = requests.post(
             OLLAMA_URL,
             json={
-                'model': MODEL_NAME,
+                'model': model_for_request,
                 'prompt': text,
                 'options': {
                     'num_predict': NUM_PREDICT
@@ -61,7 +63,17 @@ def do_task(text: str) -> str:
         logger.debug(f"Response content: {response.content}")
 
         if response.status_code == 404:
-            return 'Модель не найдена! Читайте README файл!'
+            if model_for_request != DEFAULT_MODEL_NAME:
+                logger.warning(
+                    "Model '%s' not found. Falling back to '%s'",
+                    model_for_request,
+                    DEFAULT_MODEL_NAME
+                )
+                return do_task(text, DEFAULT_MODEL_NAME)
+            return (
+                f'Модель "{model_for_request}" не найдена в Ollama. '
+                'Проверьте OLLAMA_MODEL и docker-compose.'
+            )
 
         if response.status_code == 200:
             return _parse_response(response.text)

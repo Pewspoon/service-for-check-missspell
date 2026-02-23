@@ -1,4 +1,3 @@
-version: "3"
 services: 
   app:
     build: ./app/
@@ -7,6 +6,8 @@ services:
     restart: unless-stopped
     env_file:
     - ./app/.env
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
     volumes:
       - ./app:/app
     depends_on:
@@ -82,32 +83,69 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - event-planner-network
-    command: /bin/sh -c "ollama pull gemma3:270M-F16 || true && exec ollama serve"
+    command: serve
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ollama_init:
+    image: curlimages/curl:8.12.1
+    container_name: event-planner-ollama-init
+    restart: "no"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
+    depends_on:
+      ollama:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - |
+        until curl --fail --silent http://ollama:11434/api/tags >/dev/null; do
+          echo "waiting for ollama api..."
+          sleep 2
+        done
+        response=$(curl --fail --show-error --silent \
+          http://ollama:11434/api/pull \
+          -H "Content-Type: application/json" \
+          -d "{\"name\":\"$${OLLAMA_MODEL}\"}")
+        echo "$$response"
+        if echo "$$response" | grep -q '"error"'; then
+          echo "Failed to pull model: $${OLLAMA_MODEL}"
+          exit 1
+        fi
+    networks:
+      - event-planner-network
 
   ml_worker:
     build: ./ml_worker/
     restart: unless-stopped
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
     depends_on:
       rabbitmq:
         condition: service_healthy
-      ollama:
-        condition: service_started
+      ollama_init:
+        condition: service_completed_successfully
     networks:
       - event-planner-network
     deploy:
       replicas: 2  # Два воркера для параллельной обработки
-  
+
   streamlit:
     build: ./streamlit/
     container_name: event-planner-streamlit
     restart: unless-stopped
     environment:
-      - API_BASE_URL=http://app:8080   # имя сервиса app и порт, на котором работает FastAPI 
+      - API_BASE_URL=http://app:8080   # имя сервиса app и порт, на котором работает FastAPI
     volumes:
-      - ./streamlit:/app                # монтируем код для hot-reload при разработке
+      - ./streamlit:/app               # монтируем код для hot-reload при разработке
     depends_on:
       app:
-        condition: service_healthy       # ждём, пока бэкенд станет здоров
+        condition: service_healthy     # ждём, пока бэкенд станет здоров
     networks:
       - event-planner-network
     # Для отладки можно открыть порт наружу (раскомментировать при необходимости)

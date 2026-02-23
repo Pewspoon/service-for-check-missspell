@@ -1,12 +1,15 @@
 from __future__ import annotations
-
 import os
 import sys
 from pathlib import Path
-
 import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, Session, create_engine
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from api import create_application
+from database.create_tables import get_session
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -27,7 +30,6 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 @pytest.fixture()
 def engine():
     # Регистрируем модели в metadata до create_all
-    import models.user  # noqa: F401
 
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -116,14 +118,6 @@ def ml_model_factory(session):
 def client(engine):
     pytest.importorskip("fastapi")
     pytest.importorskip("pika")
-
-    from contextlib import asynccontextmanager
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    from api import create_application
-    from database.create_tables import get_session
-
     def override_get_session():
         with Session(engine) as test_session:
             yield test_session
