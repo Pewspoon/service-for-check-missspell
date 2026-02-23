@@ -19,31 +19,47 @@ from models.user import MLModel
 from sqlmodel import Session, select
 import uvicorn
 import logging
+import os
 
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
+LEGACY_MODEL_NAMES = {"gemma3:270M-F16"}
 
 
 def create_default_ml_model():
     """Создаёт ML-модель по умолчанию, если она не существует."""
     with Session(engine) as session:
         existing = session.exec(
-            select(MLModel).where(MLModel.name == "gemma3:270M-F16")
+            select(MLModel).where(MLModel.name == DEFAULT_OLLAMA_MODEL)
         ).first()
         if not existing:
-            ml_model = MLModel(
-                name="gemma3:270M-F16",
-                version="1.0.0",
-                description="Default ML model for text processing",
-                file_path="/models/gemma3:270M-F16",
-                user_id=1  # системный пользователь
-            )
-            session.add(ml_model)
-            session.commit()
-            logger.info("Default ML model created: gemma3:270M-F16")
+            legacy_model = session.exec(
+                select(MLModel).where(MLModel.name.in_(LEGACY_MODEL_NAMES))
+            ).first()
+            if legacy_model:
+                legacy_model.name = DEFAULT_OLLAMA_MODEL
+                legacy_model.file_path = f"/models/{DEFAULT_OLLAMA_MODEL}"
+                session.add(legacy_model)
+                session.commit()
+                logger.info(
+                    "Legacy ML model renamed to default model: %s",
+                    DEFAULT_OLLAMA_MODEL,
+                )
+            else:
+                ml_model = MLModel(
+                    name=DEFAULT_OLLAMA_MODEL,
+                    version="1.0.0",
+                    description="Default ML model for text processing",
+                    file_path=f"/models/{DEFAULT_OLLAMA_MODEL}",
+                    user_id=1  # системный пользователь
+                )
+                session.add(ml_model)
+                session.commit()
+                logger.info("Default ML model created: %s", DEFAULT_OLLAMA_MODEL)
         else:
-            logger.info("ML model already exists: gemma3:270M-F16")
+            logger.info("ML model already exists: %s", DEFAULT_OLLAMA_MODEL)
 
 
 @asynccontextmanager

@@ -131,8 +131,9 @@ class MLWorker:
             # Извлекаем данные из features
             features = data.get('features', {})
             text = features.get('text', '')
+            model_name = data.get('model')
 
-            result = do_task(text)
+            result = do_task(text, model_name)
 
             logger.info(f"Result: {result}")
 
